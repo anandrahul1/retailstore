@@ -1,0 +1,166 @@
+version: '3.8'
+
+services:
+  # User Management Service
+  user-management:
+    build:
+      context: ./backend/services/user-management
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy
+      - USERS_TABLE=retail-users
+      - SECRET_KEY=your-secret-key-for-development
+      - CORS_ORIGINS=http://localhost:3000
+    depends_on:
+      - dynamodb-local
+    networks:
+      - retail-network
+
+  # Product Catalog Service
+  product-catalog:
+    build:
+      context: ./backend/services/product-catalog
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy
+      - PRODUCTS_TABLE=retail-products
+      - SECRET_KEY=your-secret-key-for-development
+      - CORS_ORIGINS=http://localhost:3000
+    depends_on:
+      - dynamodb-local
+    networks:
+      - retail-network
+
+  # Shopping Cart Service
+  shopping-cart:
+    build:
+      context: ./backend/services/shopping-cart
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy
+      - CARTS_TABLE=retail-carts
+      - PRODUCTS_TABLE=retail-products
+      - SECRET_KEY=your-secret-key-for-development
+      - CORS_ORIGINS=http://localhost:3000
+    depends_on:
+      - dynamodb-local
+    networks:
+      - retail-network
+
+  # Order Management Service
+  order-management:
+    build:
+      context: ./backend/services/order-management
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy
+      - ORDERS_TABLE=retail-orders
+      - CARTS_TABLE=retail-carts
+      - PRODUCTS_TABLE=retail-products
+      - SECRET_KEY=your-secret-key-for-development
+      - CORS_ORIGINS=http://localhost:3000
+      - EVENT_BUS_NAME=retail-store-events
+    depends_on:
+      - dynamodb-local
+    networks:
+      - retail-network
+
+  # Payment Service
+  payment:
+    build:
+      context: ./backend/services/payment
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8005"
+    environment:
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy
+      - ORDERS_TABLE=retail-orders
+      - SECRET_KEY=your-secret-key-for-development
+      - CORS_ORIGINS=http://localhost:3000
+      - EVENT_BUS_NAME=retail-store-events
+    depends_on:
+      - dynamodb-local
+    networks:
+      - retail-network
+
+  # Notification Service
+  notification:
+    build:
+      context: ./backend/services/notification
+      dockerfile: Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=dummy
+      - AWS_SECRET_ACCESS_KEY=dummy
+      - USERS_TABLE=retail-users
+      - SECRET_KEY=your-secret-key-for-development
+      - CORS_ORIGINS=http://localhost:3000
+    depends_on:
+      - dynamodb-local
+    networks:
+      - retail-network
+
+  # Local DynamoDB for development
+  dynamodb-local:
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
+    image: "amazon/dynamodb-local:latest"
+    container_name: dynamodb-local
+    ports:
+      - "8000:8000"
+    volumes:
+      - "./docker/dynamodb:/home/dynamodblocal/data"
+    working_dir: /home/dynamodblocal
+    networks:
+      - retail-network
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - retail-network
+
+  # API Gateway (Nginx reverse proxy)
+  api-gateway:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - user-management
+      - product-catalog
+      - shopping-cart
+      - order-management
+      - payment
+      - notification
+    networks:
+      - retail-network
+
+networks:
+  retail-network:
+    driver: bridge
+
+volumes:
+  dynamodb_data:
